@@ -30,3 +30,5 @@ reports:
 }
 
 @end verbatim
+
+Note: that on FreeBSD jailed interfaces are excluded on default.

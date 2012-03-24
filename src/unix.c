@@ -40,6 +40,11 @@
 # include <sys/uio.h>
 #endif
 
+#ifdef WITH_EXCLUDE_FBSD_JAILS
+# include <sys/jail.h>
+# include <jail.h>
+#endif
+
 #define CF_IGNORE_INTERFACES "ignore_interfaces.rx"
 
 #ifndef MINGW
@@ -510,33 +515,92 @@ void Unix_CreateEmptyFile(char *name)
 static bool IgnoreJailInterface(int ifaceidx, struct sockaddr_in *inaddr)
 {
 /* FreeBSD jails */
-# ifdef HAVE_JAIL_GET
-    struct iovec fbsd_jparams[4];
-    struct in_addr fbsd_jia;
+# ifdef WITH_EXCLUDE_FBSD_JAILS
+    struct jailparam fbsd_jparams[2];
     int fbsd_lastjid = 0;
+    char ipbuffer[INET6_ADDRSTRLEN];
+    int count;
+    int ind;
+    int returned_jid;
 
-    *(const void **) &fbsd_jparams[0].iov_base = "lastjid";
-    fbsd_jparams[0].iov_len = sizeof("lastjid");
-    fbsd_jparams[1].iov_base = &fbsd_lastjid;
-    fbsd_jparams[1].iov_len = sizeof(fbsd_lastjid);
+    jailparam_init(&fbsd_jparams[0], "lastjid");
+    /* Use import_raw so that passes the address */
+    jailparam_import_raw(&fbsd_jparams[0], &fbsd_lastjid, sizeof(fbsd_lastjid));
+    jailparam_init(&fbsd_jparams[1], "ip4.addr");
 
-    *(const void **) &fbsd_jparams[2].iov_base = "ip4.addr";
-    fbsd_jparams[2].iov_len = sizeof("ip4.addr");
-    fbsd_jparams[3].iov_len = sizeof(struct in_addr);
-    fbsd_jparams[3].iov_base = &fbsd_jia;
-
-    while ((fbsd_lastjid = jail_get(fbsd_jparams, 4, 0)) > 0)
+    while ((returned_jid = jailparam_get(fbsd_jparams, 2, 0)) > 0)
     {
-        if (fbsd_jia.s_addr == inaddr->sin_addr.s_addr)
+        fbsd_lastjid = returned_jid;
+        /*CfOut(cf_verbose, "", "D: lastjid %d, returned %d\n", fbsd_lastjid, returned_jid);*/
+        count = fbsd_jparams[1].jp_valuelen / sizeof(struct in_addr);
+        for (ind = 0; ind < count; ind++)
         {
-            CfOut(cf_verbose, "", "Interface %d belongs to a FreeBSD jail %s\n", ifaceidx, inet_ntoa(fbsd_jia));
-            return true;
+              /* CfOut(cf_verbose, "", "D: %d %s\n", ind, inet_ntop(AF_INET,
+		    &((struct in_addr *)fbsd_jparams[1].jp_value)[ind],
+		    ipbuffer, sizeof(ipbuffer)));*/
+               if (((struct in_addr *)fbsd_jparams[1].jp_value)[ind].s_addr == inaddr->sin_addr.s_addr)
+               {
+                   CfOut(cf_verbose, "", "Interface %d (%s) belongs to a FreeBSD jail\n",
+                       ifaceidx, inet_ntop(AF_INET,
+                       &((struct in_addr *)fbsd_jparams[1].jp_value)[ind],
+                       ipbuffer, sizeof(ipbuffer)));
+                   jailparam_free(fbsd_jparams, 2);
+                   return true;
+               }
         }
     }
+
+    jailparam_free(fbsd_jparams, 2);
+    /* Is there something other to be freed ?? */
 # endif
 
     return false;
 }
+
+/******************************************************************/
+
+/* TODO same for ipv6
+static bool IgnoreJailInterface6(int ifaceidx, struct sockaddr_in6 *inaddr)
+{
+# ifdef HAVE_LIBJAIL
+    struct jailparam fbsd_jparams[2];
+    int fbsd_lastjid = 0;
+    char ipbuffer[INET6_ADDRSTRLEN];
+    int count;
+    int ind;
+    int returned_jid;
+
+    jailparam_init(&fbsd_jparams[0], "lastjid");
+    jailparam_import_raw(&fbsd_jparams[0], &fbsd_lastjid, sizeof(fbsd_lastjid));
+    jailparam_init(&fbsd_jparams[1], "ip6.addr");
+
+    while ((returned_jid = jailparam_get(fbsd_jparams, 2, 0)) > 0)
+    {
+        fbsd_lastjid = returned_jid;
+        count = fbsd_jparams[1].jp_valuelen / sizeof(struct in6_addr);
+        for (ind = 0; ind < count; ind++)
+        {
+               CfOut(cf_verbose, "", "D: %d %s\n", ind, inet_ntop(AF_INET6,
+		    &((struct in6_addr *)fbsd_jparams[1].jp_value)[ind],
+		    ipbuffer, sizeof(ipbuffer)));
+               if (((struct in_addr *)fbsd_jparams[1].jp_value)[ind].s_addr == inaddr->sin_addr.s_addr)
+               {
+                   CfOut(cf_verbose, "", "Interface %d (%s) belongs to a FreeBSD jail\n",
+                       ifaceidx, inet_ntop(AF_INET,
+                       &((struct in_addr6 *)fbsd_jparams[1].jp_value)[ind],
+                       ipbuffer, sizeof(ipbuffer)));
+                   jailparam_free(fbsd_jparams, 2);
+                   return true;
+               }
+        }
+    }
+
+    jailparam_free(fbsd_jparams, 2);
+# endif
+
+    return false;
+}
+*/
 
 /******************************************************************/
 

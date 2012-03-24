@@ -493,8 +493,6 @@ AC_CHECK_FUNCS(dirfd, [], [
     AC_LIBOBJ([dirfd])
   fi])
 
-AC_CHECK_FUNCS(jail_get)
-
 dnl
 dnl Various functions
 dnl
@@ -861,6 +859,18 @@ if test "x$use_coverage" = "xyes"; then
   LDFLAGS="$LDFLAGS -lgcov"
 fi
 
+dnl ######################################################################
+dnl Exclude FreeBSD jails
+dnl ######################################################################
+
+AC_ARG_ENABLE([exclude_jails], [AS_HELP_STRING([--disable-exclude-jails], [Do not exclude FreeBSD jails from the interface list (uses libjail)])])
+
+AS_IF([test "x$enable_exclude_jails" != "xno"], [
+    AC_DEFINE(WITH_EXCLUDE_FBSD_JAILS, 1, [Define if you want to exclude FreeBSD jails from the interface list])
+    LIB_JAILS="-ljail"
+    LIBS="$LIBS $LIB_JAILS"
+    AC_SUBST(LIB_JAILS)
+])
 
 dnl ######################################################################
 dnl Summarize

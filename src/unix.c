@@ -456,11 +456,12 @@ int Unix_LoadProcessTable(Item **procdata)
     CopyList(&rootprocs, *procdata);
     CopyList(&otherprocs, *procdata);
 
-    while (DeleteItemNotContaining(&rootprocs, "root"))
+    /* This assumes that username does not contain space (POSIX) */
+    while (DeleteItemNotMatching(&rootprocs, "^root\\ +.*"))
     {
     }
 
-    while (DeleteItemContaining(&otherprocs, "root"))
+    while (DeleteItemMatching(&otherprocs, "^root\\ +.*"))
     {
     }
 

@@ -863,11 +863,11 @@ dnl ######################################################################
 dnl Exclude FreeBSD jails
 dnl ######################################################################
 
-AC_ARG_ENABLE([exclude_jails], [AS_HELP_STRING([--disable-exclude-jails], [Do not exclude FreeBSD jails from the interface list (uses libjail)])])
+AC_ARG_ENABLE([exclude_jails], [AS_HELP_STRING([--disable-exclude-jails], [Do not exclude FreeBSD jails from the interface and process lists (uses libkvm and libjail)])])
 
 AS_IF([test "x$enable_exclude_jails" != "xno"], [
-    AC_DEFINE(WITH_EXCLUDE_FBSD_JAILS, 1, [Define if you want to exclude FreeBSD jails from the interface list])
-    LIB_JAILS="-ljail"
+    AC_DEFINE(WITH_EXCLUDE_FBSD_JAILS, 1, [Define if you want to exclude FreeBSD jails from the interface and process lists])
+    LIB_JAILS="-lkvm -ljail"
     LIBS="$LIBS $LIB_JAILS"
     AC_SUBST(LIB_JAILS)
 ])

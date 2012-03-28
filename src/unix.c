@@ -43,6 +43,9 @@
 #ifdef WITH_EXCLUDE_FBSD_JAILS
 # include <sys/jail.h>
 # include <jail.h>
+# include <sys/user.h>
+# include <sys/sysctl.h>
+# include <kvm.h>
 #endif
 
 #define CF_IGNORE_INTERFACES "ignore_interfaces.rx"
@@ -380,6 +383,46 @@ static int ForeignZone(char *s)
     return false;
 }
 
+/*******************************************************************/
+
+/* Returns true if process is foreign to the this jail */
+static int ForeignJail(int jailid, char *line)
+{
+    // We want to keep the banner
+    if (strstr(line, "%CPU"))
+    {
+        return false;
+    }
+
+#ifdef WITH_EXCLUDE_FBSD_JAILS
+    int proc_count = -1;
+    int pid = 0;
+    kvm_t* kvm_desc = NULL;
+    struct kinfo_proc* kvm_procs = NULL;
+
+    /* Assume that there is no space in username = POSIX */
+    pid = atoi(ExtractFirstReference("^[^\\ ]+\\ +([0-9]+).*", line));
+
+    kvm_desc = kvm_open("/dev/null", "/dev/null", NULL, O_RDONLY, NULL);
+    if (kvm_desc != NULL)
+    {
+        kvm_procs = kvm_getprocs(kvm_desc, KERN_PROC_PID, pid, &proc_count);
+    }
+    if (kvm_procs != NULL)
+    {
+        if (jailid != kvm_procs->ki_jid)
+        {
+            return true;
+        }
+    }
+    if (kvm_desc != NULL)
+    {
+       	kvm_close(kvm_desc);
+    }
+#endif
+    return false;
+}
+
 /*****************************************************************************/
 
 static char *GetProcessOptions()
@@ -422,6 +465,7 @@ int Unix_LoadProcessTable(Item **procdata)
     Item *rootprocs = NULL;
     Item *otherprocs = NULL;
     const char *psopts = GetProcessOptions();
+    int jailid = -1;
 
     snprintf(pscomm, CF_MAXLINKSIZE, "%s %s", VPSCOMM[VSYSTEMHARDCLASS], psopts);
 
@@ -433,6 +477,25 @@ int Unix_LoadProcessTable(Item **procdata)
         return false;
     }
 
+#ifdef WITH_EXCLUDE_FBSD_JAILS
+    int proc_count = -1;
+    kvm_t* kvm_desc = NULL;
+    struct kinfo_proc* kvm_procs = NULL;
+
+    kvm_desc = kvm_open("/dev/null", "/dev/null", NULL, O_RDONLY, NULL);
+    if (kvm_desc != NULL)
+    {
+        kvm_procs = kvm_getprocs(kvm_desc, KERN_PROC_PID, getpid(), &proc_count);
+    }
+    if (kvm_procs != NULL)
+    {
+        jailid = kvm_procs->ki_jid;
+    }
+    if (kvm_desc != NULL)
+    {
+       	kvm_close(kvm_desc);
+    }
+#endif
     while (!feof(prp))
     {
         memset(vbuff, 0, CF_BUFSIZE);
@@ -444,6 +507,11 @@ int Unix_LoadProcessTable(Item **procdata)
         }
 
         if (ForeignZone(vbuff))
+        {
+            continue;
+        }
+
+        if (ForeignJail(jailid, vbuff))
         {
             continue;
         }

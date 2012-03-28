@@ -56,3 +56,6 @@ execution, but stop commands are executed immediately.
 Note: @code{process_select} was previously called process @code{filters} in
 CFEngine 2 and earlier.
 
+Note: that processes in foreign jails are excluded from the process list on 
+default.
+

@@ -850,7 +850,7 @@ static int ExecuteSchedule(PackageManager *schedule, enum package_actions action
                         strcat(offset, pi->name);
                     }
 
-                    if (ExecPackageCommand(command_string, verify, true, a, pp))
+                    if (ExecPackageCommand(command_string, verify, true, GetPackageAttributes(pi->pp), pi->pp))
                     {
                         CfOut(cf_verbose, "",
                               "Package schedule execution ok for %s (outcome cannot be promised by cf-agent)",
